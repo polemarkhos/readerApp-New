@@ -5,7 +5,10 @@
   })
 </script>
 <template>
-  <div class="flex flex-col w-[600px] h-[100vh] mx-auto my-4 items-center justify-center">
-    <h1 class="text-6xl font-bold">Register Page</h1>
+  <div
+    class="mt-10 overflow-hidden grid max-w-[980px] md:max-h-[600px] md:h-[100vh] mx-auto items-center sm:grid-cols-1 md:grid-cols-2 mb-8 md:mb-0">
+    <FormRegister
+        class="p-6 md:p-12 border h-full border-gray-200 border-bottom-none md:border-bottomm md:border-right-none md:rounded-tl-md md:rounded-bl-md "/>
+    <BlocksToLogin />
   </div>
 </template>
