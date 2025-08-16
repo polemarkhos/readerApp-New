@@ -1,5 +1,7 @@
 // https://nuxt.com/docs/api/configuration/nuxt-config
 import tailwindcss from "@tailwindcss/vite";
+import Aura from '@primeuix/themes/aura';
+
 
 export default defineNuxtConfig({
   compatibilityDate: '2025-07-15',
@@ -11,7 +13,13 @@ export default defineNuxtConfig({
     '@nuxt/scripts',
     '@nuxt/image',
   ],
-  primevue: {},
+  primevue: {
+    options: {
+      theme: {
+        preset: Aura
+      }
+    }
+  },
   css: ['~/assets/css/main.css'],
   vite: {
     plugins: [
