@@ -1,5 +1,5 @@
 // server/repository/user.ts
-import { Prisma, PrismaClient, User } from "../../app/generated/prisma"
+import { Prisma, PrismaClient, User } from "@prisma/client"
 
 class UserRepository {
     constructor(private readonly prisma: PrismaClient) { }

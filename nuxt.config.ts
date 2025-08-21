@@ -62,6 +62,7 @@ export default defineNuxtConfig({
     '@nuxt/test-utils',
     '@nuxt/scripts',
     '@nuxt/image',
+    '@prisma/nuxt'
   ],
   primevue: {
     options: {
