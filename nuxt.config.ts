@@ -58,7 +58,10 @@ export default defineNuxtConfig({
   devtools: { enabled: true },
   modules: [
     '@primevue/nuxt-module',
-    '@nuxt/ui',
+    ['@nuxt/ui', {
+      // Disable conflicting composables
+      disableColors: false
+    }],
     '@nuxt/test-utils',
     '@nuxt/scripts',
     '@nuxt/image',
