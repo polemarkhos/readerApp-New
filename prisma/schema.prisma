@@ -20,10 +20,131 @@ model User {
   password  String
   createdAt DateTime @default(now())
   updatedAt DateTime @updatedAt
+  
+  // TEI relations
+  teiDocuments  TeiDocument[]   // TEI documents uploaded by user
+  teiAnnotations TeiAnnotation[] // User's annotations on TEI documents
 }
 
 model Document {
   id       Int    @id @default(autoincrement())
   name     String
   document String
+}
+
+// TEI XML models
+model TeiDocument {
+  id          Int                @id @default(autoincrement())
+  title       String
+  filename    String             @unique
+  xmlContent  String             // The full TEI XML content
+  fileSize    Int?               // File size in bytes
+  encoding    String             @default("UTF-8")
+  createdAt   DateTime           @default(now())
+  updatedAt   DateTime           @updatedAt
+  
+  // Metadata extracted from TEI header
+  author      String?
+  editor      String?
+  publisher   String?
+  pubDate     String?
+  language    String?
+  description String?
+  
+  // Relations
+  userId      Int?               // Optional: link to user who uploaded
+  user        User?              @relation(fields: [userId], references: [id])
+  metadata    TeiMetadata?       // Detailed metadata
+  divisions   TeiDivision[]      // Text divisions (chapters, sections, etc.)
+  annotations TeiAnnotation[]    // User annotations
+  
+  @@map("tei_documents")
+}
+
+model TeiMetadata {
+  id            Int         @id @default(autoincrement())
+  teiDocumentId Int         @unique
+  teiDocument   TeiDocument @relation(fields: [teiDocumentId], references: [id], onDelete: Cascade)
+  
+  // TEI Header metadata
+  titleStmt     Json?       // Title statement
+  editionStmt   Json?       // Edition statement  
+  publicationStmt Json?     // Publication statement
+  sourceDesc    Json?       // Source description
+  profileDesc   Json?       // Text profile (languages, creation, etc.)
+  encodingDesc  Json?       // Encoding description
+  revisionDesc  Json?       // Revision history
+  
+  // Custom metadata
+  keywords      String[]    // Array of keywords/tags
+  genre         String?
+  period        String?
+  region        String?
+  
+  createdAt     DateTime    @default(now())
+  updatedAt     DateTime    @updatedAt
+  
+  @@map("tei_metadata")
+}
+
+model TeiDivision {
+  id            Int         @id @default(autoincrement())
+  teiDocumentId Int
+  teiDocument   TeiDocument @relation(fields: [teiDocumentId], references: [id], onDelete: Cascade)
+  
+  // Division structure
+  type          String      // "chapter", "section", "book", "part", etc.
+  level         Int         // Hierarchy level (1 = top level, 2 = subsection, etc.)
+  n             String?     // Division number/identifier from XML
+  head          String?     // Division heading/title
+  
+  // Content and position
+  xmlId         String?     // Original xml:id from TEI
+  content       String      // Text content of the division
+  startOffset   Int?        // Character offset in full document
+  endOffset     Int?        // End character offset
+  
+  // Hierarchy
+  parentId      Int?
+  parent        TeiDivision? @relation("DivisionHierarchy", fields: [parentId], references: [id])
+  children      TeiDivision[] @relation("DivisionHierarchy")
+  
+  order         Int         // Order within same level
+  createdAt     DateTime    @default(now())
+  
+  @@map("tei_divisions")
+  @@index([teiDocumentId, level, order])
+}
+
+model TeiAnnotation {
+  id            Int         @id @default(autoincrement())
+  teiDocumentId Int
+  teiDocument   TeiDocument @relation(fields: [teiDocumentId], references: [id], onDelete: Cascade)
+  
+  userId        Int?
+  user          User?       @relation(fields: [userId], references: [id])
+  
+  // Annotation data
+  type          String      // "note", "highlight", "bookmark", "comment", etc.
+  content       String?     // Annotation content/text
+  
+  // Position in document
+  startOffset   Int?        // Character position start
+  endOffset     Int?        // Character position end  
+  xmlId         String?     // Reference to TEI element id
+  xpath         String?     // XPath to referenced element
+  
+  // Selected text (for highlights/comments)
+  selectedText  String?
+  
+  // Metadata
+  tags          String[]    // User-defined tags
+  isPrivate     Boolean     @default(false)
+  
+  createdAt     DateTime    @default(now())
+  updatedAt     DateTime    @updatedAt
+  
+  @@map("tei_annotations")
+  @@index([teiDocumentId, userId])
+  @@index([type])
 }
