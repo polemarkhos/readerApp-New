@@ -1,6 +1,18 @@
 /**
  * TEI XML Parser utilities for extracting and formatting content
  */
+import { DOMParser as XMLDOMParser } from '@xmldom/xmldom'
+
+// Use browser DOMParser on client, xmldom on server
+const getParser = () => {
+  if (typeof window !== 'undefined' && window.DOMParser) {
+    return window.DOMParser
+  }
+  return XMLDOMParser
+}
+
+// Check if we're running on client (browser supports querySelector)
+const isClient = () => typeof window !== 'undefined'
 
 export interface TeiContent {
   title: string
@@ -36,26 +48,33 @@ export class TeiParser {
    * Parse TEI XML content and extract readable text
    */
   static parseXmlContent(xmlContent: string): TeiContent {
-    // Create a DOM parser for XML
-    const parser = new DOMParser()
-    const xmlDoc = parser.parseFromString(xmlContent, 'text/xml')
-    
-    // Check for parsing errors
-    const parserError = xmlDoc.querySelector('parsererror')
-    if (parserError) {
-      throw new Error('Invalid XML content')
-    }
-
-    const metadata = this.extractMetadata(xmlDoc)
-    const content = this.extractTextContent(xmlDoc)
-    const chapters = this.extractChapters(xmlDoc)
-
-    return {
-      title: metadata.title || 'Untitled Document',
-      author: metadata.author,
-      content,
-      chapters,
-      metadata
+    try {
+      // Create a DOM parser for XML
+      const Parser = getParser()
+      const parser = new Parser()
+      const xmlDoc = parser.parseFromString(xmlContent, 'text/xml')
+      
+      // Check for parsing errors (XMLDOM specific)
+      if (!xmlDoc.documentElement || xmlDoc.documentElement.tagName === 'parsererror') {
+        console.error('XML Parsing error: Invalid XML structure')
+        throw new Error('Invalid XML content: malformed XML')
+      }
+      
+      
+      const metadata = this.extractMetadata(xmlDoc)
+      const content = this.extractTextContent(xmlDoc)
+      const chapters = this.extractChapters(xmlDoc)
+      
+      return {
+        title: metadata.title || 'Untitled Document',
+        author: metadata.author,
+        content,
+        chapters,
+        metadata
+      }
+    } catch (error) {
+      console.error('Error in parseXmlContent:', error)
+      throw error
     }
   }
 
@@ -63,23 +82,23 @@ export class TeiParser {
    * Extract metadata from TEI header
    */
   private static extractMetadata(xmlDoc: Document): TeiMetadata {
-    const teiHeader = xmlDoc.querySelector('teiHeader')
+    const teiHeader = this.getElementByTagName(xmlDoc, 'teiHeader')
     if (!teiHeader) return { keywords: [] }
 
-    const titleStmt = teiHeader.querySelector('titleStmt')
-    const publicationStmt = teiHeader.querySelector('publicationStmt')
-    const sourceDesc = teiHeader.querySelector('sourceDesc')
+    const titleStmt = this.getElementByTagName(teiHeader, 'titleStmt')
+    const publicationStmt = this.getElementByTagName(teiHeader, 'publicationStmt')
+    const sourceDesc = this.getElementByTagName(teiHeader, 'sourceDesc')
 
     return {
-      title: titleStmt?.querySelector('title')?.textContent?.trim(),
-      author: titleStmt?.querySelector('author')?.textContent?.trim(),
-      editor: titleStmt?.querySelector('editor')?.textContent?.trim(),
-      publisher: publicationStmt?.querySelector('publisher')?.textContent?.trim(),
-      pubDate: publicationStmt?.querySelector('date')?.textContent?.trim(),
+      title: titleStmt ? this.getElementByTagName(titleStmt, 'title')?.textContent?.trim() : undefined,
+      author: titleStmt ? this.getElementByTagName(titleStmt, 'author')?.textContent?.trim() : undefined,
+      editor: titleStmt ? this.getElementByTagName(titleStmt, 'editor')?.textContent?.trim() : undefined,
+      publisher: publicationStmt ? this.getElementByTagName(publicationStmt, 'publisher')?.textContent?.trim() : undefined,
+      pubDate: publicationStmt ? this.getElementByTagName(publicationStmt, 'date')?.textContent?.trim() : undefined,
       language: xmlDoc.documentElement.getAttribute('xml:lang') || undefined,
-      description: sourceDesc?.querySelector('p')?.textContent?.trim(),
+      description: sourceDesc ? this.getElementByTagName(sourceDesc, 'p')?.textContent?.trim() : undefined,
       keywords: this.extractKeywords(teiHeader),
-      genre: teiHeader.querySelector('textClass catRef')?.getAttribute('target')
+      genre: undefined // Will implement later if needed
     }
   }
 
@@ -88,14 +107,17 @@ export class TeiParser {
    */
   private static extractKeywords(teiHeader: Element): string[] {
     const keywords: string[] = []
-    const keywordElements = teiHeader.querySelectorAll('keywords term, textClass catRef')
+    const keywordParent = this.getElementByTagName(teiHeader, 'keywords')
     
-    keywordElements.forEach(el => {
-      const keyword = el.textContent?.trim() || el.getAttribute('target')?.replace('#', '')
-      if (keyword) {
-        keywords.push(keyword)
-      }
-    })
+    if (keywordParent) {
+      const termElements = this.getElementsByTagName(keywordParent, 'term')
+      termElements.forEach(el => {
+        const keyword = el.textContent?.trim()
+        if (keyword) {
+          keywords.push(keyword)
+        }
+      })
+    }
 
     return keywords
   }
@@ -104,16 +126,14 @@ export class TeiParser {
    * Extract main text content from TEI body
    */
   private static extractTextContent(xmlDoc: Document): string {
-    const body = xmlDoc.querySelector('text body')
+    const textElement = this.getElementByTagName(xmlDoc, 'text')
+    if (!textElement) return ''
+    
+    const body = this.getElementByTagName(textElement, 'body')
     if (!body) return ''
 
-    // Remove unwanted elements
-    const clone = body.cloneNode(true) as Element
-    const elementsToRemove = clone.querySelectorAll('note[place="foot"], pb, lb')
-    elementsToRemove.forEach(el => el.remove())
-
     // Clean up the text content
-    const textContent = clone.textContent || ''
+    const textContent = body.textContent || ''
     return textContent.replace(/\s+/g, ' ').trim()
   }
 
@@ -121,11 +141,14 @@ export class TeiParser {
    * Extract chapter/division structure
    */
   private static extractChapters(xmlDoc: Document): TeiChapter[] {
-    const body = xmlDoc.querySelector('text body')
+    const textElement = this.getElementByTagName(xmlDoc, 'text')
+    if (!textElement) return []
+    
+    const body = this.getElementByTagName(textElement, 'body')
     if (!body) return []
 
     const chapters: TeiChapter[] = []
-    const divElements = body.querySelectorAll('div')
+    const divElements = this.getElementsByTagName(body, 'div')
 
     divElements.forEach((div, index) => {
       const chapter = this.extractChapterFromDiv(div, 1, index + 1)
@@ -145,18 +168,14 @@ export class TeiParser {
     const type = div.getAttribute('type') || 'chapter'
     
     // Get chapter title from head element
-    const headElement = div.querySelector(':scope > head')
+    const headElement = this.getElementByTagName(div, 'head')
     const title = headElement?.textContent?.trim() || `${type.charAt(0).toUpperCase() + type.slice(1)} ${order}`
 
-    // Get content excluding nested divs
-    const clone = div.cloneNode(true) as Element
-    const nestedDivs = clone.querySelectorAll('div')
-    nestedDivs.forEach(nestedDiv => nestedDiv.remove())
-    
-    const content = clone.textContent?.replace(/\s+/g, ' ').trim() || ''
+    // Get content (simple text extraction for now)
+    const content = div.textContent?.replace(/\s+/g, ' ').trim() || ''
 
     // Extract child chapters
-    const childDivs = div.querySelectorAll(':scope > div')
+    const childDivs = this.getElementsByTagName(div, 'div')
     const children: TeiChapter[] = []
     
     childDivs.forEach((childDiv, childIndex) => {
@@ -180,6 +199,21 @@ export class TeiParser {
    * Format content for display (convert XML markup to HTML)
    */
   static formatContentForDisplay(xmlContent: string): string {
+    if (!xmlContent.trim()) {
+      return '<p>No content available.</p>'
+    }
+    
+    // If it's plain text without XML tags, wrap in paragraphs
+    if (!xmlContent.includes('<')) {
+      return xmlContent
+        .split(/\n\n+/)
+        .map(paragraph => paragraph.trim())
+        .filter(paragraph => paragraph.length > 0)
+        .map(paragraph => `<p class="mb-4">${paragraph}</p>`)
+        .join('')
+    }
+    
+    // If it contains XML, process the markup
     return xmlContent
       .replace(/<p>/g, '<p class="mb-4">')
       .replace(/<hi rend="italic">/g, '<em>')
@@ -207,14 +241,14 @@ export class TeiParser {
    * Extract plain text content without XML markup
    */
   static extractPlainText(xmlContent: string): string {
-    const parser = new DOMParser()
+    const Parser = getParser()
+    const parser = new Parser()
     const xmlDoc = parser.parseFromString(xmlContent, 'text/xml')
     
-    // Remove unwanted elements
-    const elementsToRemove = xmlDoc.querySelectorAll('note[place="foot"], pb, lb, teiHeader')
-    elementsToRemove.forEach(el => el.remove())
+    const textElement = this.getElementByTagName(xmlDoc, 'text')
+    if (!textElement) return ''
     
-    return xmlDoc.textContent?.replace(/\s+/g, ' ').trim() || ''
+    return textElement.textContent?.replace(/\s+/g, ' ').trim() || ''
   }
 
   /**
@@ -238,6 +272,34 @@ export class TeiParser {
 
     chapters.forEach(chapter => processChapter(chapter, 1))
     return toc
+  }
+
+  /**
+   * Helper method to get first element by tag name
+   */
+  private static getElementByTagName(parent: Document | Element, tagName: string): Element | null {
+    if (isClient() && 'querySelector' in parent) {
+      // On client, we can use querySelector
+      return (parent as any).querySelector(tagName)
+    } else {
+      // On server, use getElementsByTagName
+      const elements = parent.getElementsByTagName(tagName)
+      return elements.length > 0 ? elements[0] : null
+    }
+  }
+
+  /**
+   * Helper method to get all elements by tag name as array
+   */
+  private static getElementsByTagName(parent: Document | Element, tagName: string): Element[] {
+    if (isClient() && 'querySelectorAll' in parent) {
+      // On client, we can use querySelectorAll
+      return Array.from((parent as any).querySelectorAll(tagName))
+    } else {
+      // On server, use getElementsByTagName
+      const nodeList = parent.getElementsByTagName(tagName)
+      return Array.from(nodeList)
+    }
   }
 }
 

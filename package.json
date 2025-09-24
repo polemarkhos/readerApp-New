@@ -20,6 +20,7 @@
     "@prisma/nuxt": "^0.3.0",
     "@tailwindcss/vite": "^4.1.12",
     "@unhead/vue": "^2.0.14",
+    "@xmldom/xmldom": "^0.8.11",
     "nuxt": "^4.0.3",
     "primevue": "^4.3.7",
     "prisma": "^6.13.0",

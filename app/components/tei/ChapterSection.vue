@@ -28,7 +28,7 @@
 
     <!-- Child Chapters -->
     <div v-if="chapter.children.length > 0" class="child-chapters mt-6">
-      <TeiChapterSection
+      <ChapterSection
         v-for="childChapter in chapter.children"
         :key="childChapter.id"
         :chapter="childChapter"
@@ -40,7 +40,7 @@
 </template>
 
 <script setup lang="ts">
-import { TeiParser, type TeiChapter } from '~/utils/teiParser'
+import { TeiParser, type TeiChapter } from '../../../utils/teiParser'
 
 interface Props {
   chapter: TeiChapter

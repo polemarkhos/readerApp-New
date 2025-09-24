@@ -16,7 +16,7 @@
 </template>
 
 <script setup lang="ts">
-import type { TocEntry } from '~/utils/teiParser'
+import type { TocEntry } from '../../../utils/teiParser'
 
 interface Props {
   entry: TocEntry

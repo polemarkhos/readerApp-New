@@ -74,7 +74,7 @@
         class="toc-sidebar w-80 bg-white shadow-lg border-r border-gray-200 fixed left-0 top-16 h-full overflow-y-auto z-20 lg:relative lg:top-0"
       >
         <div class="p-4">
-          <TeiTableOfContents
+          <TableOfContents
             :toc-entries="tableOfContents"
             :current-section="currentSection"
             @navigate="navigateToSection"
@@ -92,10 +92,24 @@
       <!-- Document Content -->
       <main :class="['flex-1', showToc ? 'lg:ml-0' : '']">
         <div class="container mx-auto px-4 py-8">
-          <TeiDocumentReader
+          <!-- Debug info -->
+          <div class="bg-green-50 p-4 rounded-lg border border-green-200 mb-4">
+            <h3 class="text-green-800 font-semibold">Page Debug Info</h3>
+            <p class="text-green-600 text-sm">Data loaded: {{ !!data }}</p>
+            <p class="text-green-600 text-sm">Data success: {{ data?.success }}</p>
+            <p class="text-green-600 text-sm">Document exists: {{ !!data?.data }}</p>
+            <p class="text-green-600 text-sm">Document title: {{ data?.data?.title }}</p>
+            <p class="text-green-600 text-sm">XML content length: {{ data?.data?.xmlContent?.length }}</p>
+          </div>
+          
+          <DocumentReader
+            v-if="data?.data"
             :document="data.data"
             @chapter-change="currentSection = $event"
           />
+          <div v-else class="bg-red-50 p-4 rounded-lg border border-red-200">
+            <p class="text-red-800">No document data available</p>
+          </div>
         </div>
       </main>
     </div>
@@ -103,7 +117,7 @@
 </template>
 
 <script setup lang="ts">
-import { TeiParser, type TocEntry } from '~/utils/teiParser'
+import { TeiParser, type TocEntry } from '../../../../utils/teiParser'
 
 // Get document ID from route
 const route = useRoute()
@@ -114,9 +128,7 @@ const showToc = ref(true)
 const currentSection = ref<string | null>(null)
 
 // Fetch document data
-const { data, pending, error, refresh } = await $fetch(`/api/tei/documents/${documentId.value}`, {
-  server: false
-})
+const { data, pending, error, refresh } = await useFetch(`/api/tei/documents/${documentId.value}`)
 
 // Compute table of contents
 const tableOfContents = computed<TocEntry[]>(() => {

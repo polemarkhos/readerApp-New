@@ -3,7 +3,7 @@
     <h3 class="font-bold text-lg mb-4">Table of Contents</h3>
     <nav>
       <ul class="space-y-2">
-        <TeiTocItem 
+        <TocItem 
           v-for="entry in tocEntries" 
           :key="entry.id"
           :entry="entry"
@@ -16,7 +16,7 @@
 </template>
 
 <script setup lang="ts">
-import type { TocEntry } from '~/utils/teiParser'
+import type { TocEntry } from '../../../utils/teiParser'
 
 interface Props {
   tocEntries: TocEntry[]

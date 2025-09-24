@@ -65,32 +65,22 @@
     </div>
 
     <!-- Content Display -->
-    <div 
-      class="tei-content prose prose-lg max-w-none"
-      :style="{ fontSize: `${fontSize}px`, lineHeight: '1.7' }"
-    >
-      <!-- Full Text View -->
-      <div v-if="viewMode === 'full'" class="full-text-view">
-        <div v-html="formattedContent"></div>
+    <div class="tei-content prose prose-lg max-w-none">
+      <!-- Debug info (keeping for now) -->
+      <div class="bg-blue-50 p-4 rounded-lg border border-blue-200 mb-4">
+        <h3 class="text-blue-800 font-semibold">Debug Info</h3>
+        <p class="text-blue-600 text-sm">Document title: {{ document.title }}</p>
+        <p class="text-blue-600 text-sm">Divisions available: {{ document.divisions?.length || 0 }}</p>
+        <p class="text-blue-600 text-sm">XML Content length: {{ document.xmlContent?.length || 'No content' }}</p>
       </div>
-
-      <!-- Chapter View -->
-      <div v-else-if="viewMode === 'chapters'" class="chapter-view">
-        <TeiChapterSection
-          v-for="chapter in parsedContent.chapters"
-          :key="chapter.id"
-          :chapter="chapter"
-          :current-chapter="currentChapter"
-          @navigate="scrollToChapter"
-        />
-      </div>
+      
+      <!-- Extracted content -->
+      <div class="content-display" v-html="textContent"></div>
     </div>
   </div>
 </template>
 
 <script setup lang="ts">
-import { TeiParser, type TeiContent, type TeiChapter } from '~/utils/teiParser'
-
 interface Props {
   document: {
     id: number
@@ -100,82 +90,46 @@ interface Props {
     description?: string
     pubDate?: string
     xmlContent: string
+    divisions?: Array<{
+      id: number
+      head: string
+      content: string
+      xmlId: string
+      order: number
+      type: string
+      level: number
+      n: string
+    }>
   }
 }
 
 const props = defineProps<Props>()
 
-// Reactive state
-const viewMode = ref<'full' | 'chapters'>('full')
-const fontSize = ref(16)
-const currentChapter = ref<string | null>(null)
-
-// Parse TEI content
-const parsedContent = computed<TeiContent>(() => {
-  try {
-    return TeiParser.parseXmlContent(props.document.xmlContent)
-  } catch (error) {
-    console.error('Failed to parse TEI content:', error)
-    return {
-      title: props.document.title,
-      author: props.document.author,
-      content: 'Failed to parse document content.',
-      chapters: [],
-      metadata: { keywords: [] }
-    }
+// Simple content extraction without complex parsing
+const textContent = computed(() => {
+  // If we have divisions from the database, use them
+  if (props.document.divisions && props.document.divisions.length > 0) {
+    return props.document.divisions
+      .sort((a, b) => a.order - b.order)
+      .map(division => `<h2>${division.head}</h2><p>${division.content}</p>`)
+      .join('')
   }
-})
-
-// Format content for display
-const formattedContent = computed(() => {
-  return TeiParser.formatContentForDisplay(parsedContent.value.content)
-})
-
-// Font size controls
-const increaseFontSize = () => {
-  if (fontSize.value < 24) {
-    fontSize.value += 2
+  
+  // Fallback: extract content from XML using simple regex
+  const xmlContent = props.document.xmlContent || ''
+  
+  // Simple regex to extract text between <p> tags
+  const paragraphs = xmlContent.match(/<p[^>]*>(.*?)<\/p>/gs) || []
+  const cleanParagraphs = paragraphs.map(p => 
+    p.replace(/<[^>]*>/g, '').trim()
+  ).filter(p => p.length > 0)
+  
+  if (cleanParagraphs.length > 0) {
+    return cleanParagraphs.map(p => `<p class="mb-4">${p}</p>`).join('')
   }
-}
-
-const decreaseFontSize = () => {
-  if (fontSize.value > 12) {
-    fontSize.value -= 2
-  }
-}
-
-// Chapter navigation
-const scrollToChapter = (chapterId: string) => {
-  currentChapter.value = chapterId
-  const element = document.getElementById(chapterId)
-  if (element) {
-    element.scrollIntoView({ behavior: 'smooth', block: 'start' })
-  }
-}
-
-// Detect current chapter while scrolling
-const updateCurrentChapter = () => {
-  if (viewMode.value !== 'chapters') return
-
-  const chapterElements = document.querySelectorAll('[data-chapter-id]')
-  const scrollTop = window.pageYOffset || document.documentElement.scrollTop
-
-  for (const element of chapterElements) {
-    const rect = element.getBoundingClientRect()
-    if (rect.top <= 100 && rect.bottom > 100) {
-      currentChapter.value = element.getAttribute('data-chapter-id')
-      break
-    }
-  }
-}
-
-// Set up scroll listener
-onMounted(() => {
-  window.addEventListener('scroll', updateCurrentChapter)
-})
-
-onUnmounted(() => {
-  window.removeEventListener('scroll', updateCurrentChapter)
+  
+  // Last fallback: show a message
+  return '<p class="text-gray-600">Content could not be extracted from this TEI document.</p>'
 })
 </script>
 

@@ -1,4 +1,4 @@
-import { teiDocumentRepository } from '~/server/repository/teiDocument'
+import { teiDocumentRepository } from '../../../../repository/teiDocument'
 
 export default defineEventHandler(async (event) => {
   try {
